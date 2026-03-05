@@ -2825,9 +2825,34 @@ document.addEventListener('DOMContentLoaded', function() {
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(r => console.log('✅ Service Worker enregistré'))
-          .catch(e => console.log('SW non disponible (file://)', e.message));
+        navigator.serviceWorker.register('./sw.js').then(reg => {
+          console.log('✅ Service Worker enregistré');
+
+          // Vérifie si une mise à jour est disponible
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // Nouvelle version disponible → active immédiatement
+                newWorker.postMessage('skipWaiting');
+                console.log('[SW] Nouvelle version activée');
+              }
+            });
+          });
+
+          // Recharge la page quand le nouveau SW prend le contrôle
+          let refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) {
+              refreshing = true;
+              window.location.reload();
+            }
+          });
+
+          // Vérifie les mises à jour toutes les 60 secondes
+          setInterval(() => reg.update(), 60000);
+
+        }).catch(e => console.log('[SW] Non disponible (normal en local):', e.message));
       });
     }
   </script>
